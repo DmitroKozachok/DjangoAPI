@@ -97,6 +97,8 @@ WSGI_APPLICATION = 'atbapi.wsgi.application'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
     "http://127.0.0.1:5173",
 ]
 
@@ -178,4 +180,4 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-RECAPTCHA_SECRET_KEY = "6Ldyru4rAAAAAEzFpCLq5YENjjmtvDlQ0hLXCiMG"
+RECAPTCHA_SECRET_KEY = "6Ldyru4rAAAAAPVbgpOFly9QyBhPpTxK9Bd-vTPm"

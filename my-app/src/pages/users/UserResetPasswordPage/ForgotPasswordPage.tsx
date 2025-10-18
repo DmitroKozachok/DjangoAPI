@@ -1,0 +1,44 @@
+import React from "react";
+import {Typography, Card, Row} from "antd";
+import ResetPasswordRequestForm from "../../../components/forms/ResetPasswordRequestForm.tsx";
+
+const { Title, Text } = Typography;
+
+const ForgotPasswordPage: React.FC = () => {
+    return (
+        <div
+            style={{
+                minHeight: "100vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#f5f5f5",
+                padding: "20px",
+            }}
+            className="dark:bg-gray-900"
+        >
+            <Card
+                style={{
+                    maxWidth: 900,
+                    width: "100%",
+                    borderRadius: "16px",
+                    overflow: "hidden",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                }}
+                className="dark:shadow-gray-800"
+            >
+                <Row>
+                    <div style={{ textAlign: "center", marginBottom: 24 }}>
+                        <Title level={3} style={{ marginBottom: 0 }}>
+                            Forgot Password?
+                        </Title>
+                        <Text>Enter your information to reset</Text>
+                    </div>
+                    <ResetPasswordRequestForm />
+                </Row>
+            </Card>
+        </div>
+    );
+};
+
+export default ForgotPasswordPage;

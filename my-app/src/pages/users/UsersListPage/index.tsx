@@ -6,6 +6,8 @@ const UsersListPage = () => {
 
     console.log("isLoading...", isLoading);
 
+    console.log("users...", users);
+
     const contentUsers = users?.map((user) => {
         return (
             <UserListItem key={user.id} user={user} />
@@ -15,13 +17,16 @@ const UsersListPage = () => {
     return (
         <>
 
-            <h1 className={"text-3xl font-bold text-center"}>Користувачі</h1>
+            <h1 className={"text-3xl font-bold text-center text-gray-900 dark:text-white"}>Користувачі</h1>
             <div className="relative overflow-x-auto">
                 <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-800">
                     <tr>
                         <th scope="col" className="px-6 py-3">
                             Id
+                        </th>
+                        <th scope="col" className="px-6 py-3">
+
                         </th>
                         <th scope="col" className="px-6 py-3">
                             Full name
