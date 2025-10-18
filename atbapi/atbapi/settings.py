@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-c=fx(3m6b^euazx0ek=959a1qd2t3!3jkjocu+gj((ci!m8^@y
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -38,14 +38,35 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
     'atbapi',
+    'drf_spectacular',
     'users',
-    "corsheaders"
+    "corsheaders",
+    'topics',
+    'django_filters',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+}
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",  # має бути якомога вище
-    "django.middleware.common.CommonMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -131,7 +152,30 @@ AUTH_USER_MODEL = 'users.CustomUser'
 
 STATIC_URL = 'static/'
 
+AVATARS_URL = '/images/'
+
+AVATARS_ROOT = BASE_DIR / 'images'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+ 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.ukr.net'
+EMAIL_PORT = 465 
+EMAIL_USE_SSL = True 
+EMAIL_HOST_USER = 'sendmessage1@ukr.net'
+EMAIL_HOST_PASSWORD = 'yvDvv6Xcm9Ci0tTq'
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+FRONTEND_URL='http://localhost:5173'
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'DjangoApi',
+    'DESCRIPTION': 'Django REST API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
+RECAPTCHA_SECRET_KEY = "6Ldyru4rAAAAAEzFpCLq5YENjjmtvDlQ0hLXCiMG"

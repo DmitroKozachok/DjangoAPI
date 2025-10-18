@@ -1,7 +1,185 @@
 from rest_framework import serializers
 from .models import CustomUser
+from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
+from django.core.mail import send_mail
+from django.conf import settings
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+import requests
+from rest_framework_simplejwt.tokens import RefreshToken
+from .utils import download_image_as_file, compress_image, generate_tokens_for_user
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'image_small', 'image_medium', 'image_large']
+        fields = [
+            'id', 
+            'username', 
+            'email', 
+            'first_name', 
+            'last_name', 
+            'image_small', 
+            'image_medium', 
+            'image_large'
+        ]
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    image = serializers.ImageField(write_only=True, required=False)
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            'username',
+            'email',
+            'password',
+            'first_name',
+            'last_name',
+            'image',
+        ]
+
+    def create(self, validated_data):
+        image = validated_data.pop('image', None)
+        user = CustomUser.objects.create_user(
+            **validated_data
+        )
+
+        if image:
+            name = compress_image(image, size=(300, 300))
+            user.image_small = name
+            user.save()
+
+            name = compress_image(image, size=(800, 800))
+            user.image_medium = name
+            user.save()
+
+            name = compress_image(image, size=(1200, 1200))
+            user.image_large = name
+            user.save()
+
+        return user
+    
+
+User = get_user_model()
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Користувача з таким email не існує")
+        return value
+
+    def save(self):
+        email = self.validated_data['email']
+        user = User.objects.get(email=email)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_link = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
+
+        send_mail(
+            subject="Відновлення паролю",
+            message=f"",
+            html_message=f"""
+                <html>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                    <div style="max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px;">
+                        <h2 style="color: #635985;">Відновлення паролю</h2>
+                        <p>Щоб змінити пароль, перейдіть за посиланням:</p>
+                        <p><a href="{reset_link}" style="background-color:#443C68; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Змінити пароль</a></p>
+                        <p>Якщо ви не запитували відновлення, просто ігноруйте цей лист.</p>
+                    </div>
+                </body>
+                </html>
+            """,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+        )
+
+class SetNewPasswordSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(min_length=8)
+
+    def validate(self, attrs):
+        try:
+            uid = urlsafe_base64_decode(attrs['uid']).decode()
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise serializers.ValidationError("Невірний uid")
+
+        if not default_token_generator.check_token(user, attrs['token']):
+            raise serializers.ValidationError("Невірний або прострочений токен")
+
+        attrs['user'] = user
+        return attrs
+
+    def save(self):
+        user = self.validated_data['user']
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["id"] = user.id
+        token["username"] = user.username
+        token["email"] = user.email
+        token["image"] = user.image_small if getattr(user, "image_small", None) else None
+        token["date_joined"] = user.date_joined.strftime("%Y-%m-%d %H:%M:%S") if getattr(user, "date_joined", None) else None
+        return token
+    
+class GoogleLoginSerializer(serializers.Serializer):
+    token = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        token = attrs.get("token")
+        if not token:
+            raise serializers.ValidationError({"detail": "Missing Google token"})
+
+        google_userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(google_userinfo_url, headers=headers)
+
+        if response.status_code != 200:
+            raise serializers.ValidationError({"detail": "Invalid Google token"})
+
+        data = response.json()
+
+        email = data.get("email")
+        first_name = data.get("given_name", "")
+        last_name = data.get("family_name", "")
+        picture = data.get("picture")
+
+        if not email:
+            raise serializers.ValidationError({"detail": "Email not provided by Google"})
+
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "username": email.split("@")[0],
+                "first_name": first_name,
+                "last_name": last_name,
+            }
+        )
+
+        if created and picture:
+            try:
+                image = download_image_as_file(picture)
+
+                user.image_small = compress_image(image, size=(300, 300))
+                user.image_medium = compress_image(image, size=(800, 800))
+                user.image_large = compress_image(image, size=(1200, 1200))
+                user.save()
+            except Exception as e:
+                print("Image save error:", e)
+
+        attrs = generate_tokens_for_user(user)
+        return attrs
+
+    def create(self, validated_data):
+        return validated_data
