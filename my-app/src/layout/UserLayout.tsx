@@ -28,6 +28,8 @@ const UserLayout: React.FC = () => {
                     </Link>
                 </div>
 
+                <ThemeToggleButton />
+
                 <div className="flex items-center gap-4">
                     {user ? (
                         <>
