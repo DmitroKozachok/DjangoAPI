@@ -1,0 +1,140 @@
+using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Reflection;
+using System.Text;
+using WebAPI.Data.Entities.Identity;
+using WebAPI.Data;
+using WebAPI.Filters;
+using WebAPI.Helpers;
+using WebAPI.Interfaces;
+using WebAPI.Models.Account;
+using WebAPI.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<AppDbContext>(opt =>
+    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = new SnakeCaseNamingPolicy();
+        options.JsonSerializerOptions.DictionaryKeyPolicy = new SnakeCaseNamingPolicy();
+    });
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateIssuerSigningKey = true,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero,
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+});
+
+builder.Services.AddIdentity<UserEntity, RoleEntity>(options =>
+{
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequiredLength = 6;
+    options.Password.RequireNonAlphanumeric = false;
+})
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
+var assemblyName = typeof(LoginModel).Assembly.GetName().Name;
+
+builder.Services.AddSwaggerGen(options =>
+{
+    var fileDoc = $"{assemblyName}.xml";
+    var filePath = Path.Combine(AppContext.BaseDirectory, fileDoc);
+    options.IncludeXmlComments(filePath);
+
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Your API", Version = "v1" });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme.",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type=ReferenceType.SecurityScheme,
+                    Id="Bearer"
+                }
+            },
+            new string[]{}
+        }
+    });
+});
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+builder.Services.AddScoped<IMediaService, MediaService>();
+builder.Services.AddScoped<IJWTTokenService, JWTTokenService>();
+builder.Services.AddScoped<ISmtpService, SmtpService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.SuppressModelStateInvalidFilter = true;
+});
+
+builder.Services.AddValidatorsFromAssemblies(AppDomain.CurrentDomain.GetAssemblies());
+
+builder.Services.AddMvc(options =>
+{
+    options.Filters.Add<ValidationFilter>();
+});
+
+var app = builder.Build();
+
+app.UseCors();
+
+app.UseSwagger();
+app.UseSwaggerUI();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+await app.InitializeAppAsync();
+
+app.Seed();
+
+app.Run();

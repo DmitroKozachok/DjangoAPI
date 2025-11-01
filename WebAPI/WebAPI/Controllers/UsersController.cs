@@ -1,0 +1,61 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using WebAPI.Interfaces;
+using WebAPI.Models.Account;
+
+namespace WebAPI.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+public class UsersController(IAccountService accountService) : ControllerBase
+{
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginModel model)
+    {
+        var result = await accountService.LoginAsync(model);
+        return Ok(new
+        {
+            access = result?["access"],
+            refresh = result?["refresh"]
+        });
+    }
+
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromForm] RegisterModel model)
+    {
+        var result = await accountService.RegisterAsync(model);
+        if (result == null)
+        {
+            return BadRequest(new
+            {
+                Status = 400,
+                IsValid = false,
+                Errors = new { Email = "Помилка реєстрації" }
+            });
+        }
+        return Ok(new
+        {
+            access = result?["access"],
+            refresh = result?["refresh"]
+        });
+    }
+
+    [HttpPost("google-login")]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequestModel model)
+    {
+        var result = await accountService.LoginByGoogle(model.Token);
+        if (result == null)
+        {
+            return BadRequest(new
+            {
+                Status = 400,
+                IsValid = false,
+                Errors = new { Email = "Помилка реєстрації" }
+            });
+        }
+        return Ok(new
+        {
+            access = result?["access"],
+            refresh = result?["refresh"]
+        });
+    }
+}
